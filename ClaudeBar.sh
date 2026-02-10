@@ -108,7 +108,7 @@ def check_pending_tool(transcript):
 # Determine status
 if not transcript:
     status = "active"
-elif file_age < 15:
+elif file_age < 5:
     status = "active"
 elif check_pending_tool(transcript):
     status = "pending"
