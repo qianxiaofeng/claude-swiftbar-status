@@ -2,6 +2,8 @@
 
 A [SwiftBar](https://github.com/swiftbar/SwiftBar) plugin that shows the status of your running Claude Code sessions in the macOS menu bar. Each session gets its own independent menu bar icon that auto-hides when the session ends.
 
+![Demo](demo.gif)
+
 ## Status Indicators
 
 | Icon | Color | Meaning |
@@ -36,24 +38,24 @@ Menu bar icon order matches iTerm2 tab order. Dragging tabs rearranges icons on 
 
 ## Installation
 
-1. Clone into your SwiftBar plugins directory with a `.` prefix (so SwiftBar ignores the repo files):
+1. Clone into your SwiftBar plugins directory:
 
    ```sh
    PLUGIN_DIR=$(defaults read com.ameba.SwiftBar PluginDirectory)
    git clone https://github.com/qianxiaofeng/claude-swiftbar-status.git \
-     "$PLUGIN_DIR/.claude-swiftbar-status"
+     "$PLUGIN_DIR/claude-swiftbar-status"
    ```
 
 2. Run the install script (creates 5 slots by default):
 
    ```sh
-   "$PLUGIN_DIR/.claude-swiftbar-status/install.sh"
+   "$PLUGIN_DIR/claude-swiftbar-status/install.sh"
    ```
 
    To customize the number of slots:
 
    ```sh
-   "$PLUGIN_DIR/.claude-swiftbar-status/install.sh" 3
+   "$PLUGIN_DIR/claude-swiftbar-status/install.sh" 3
    ```
 
 3. SwiftBar will pick them up automatically. Icons appear only when Claude sessions are running.
@@ -62,7 +64,7 @@ Menu bar icon order matches iTerm2 tab order. Dragging tabs rearranges icons on 
 
 ```sh
 PLUGIN_DIR=$(defaults read com.ameba.SwiftBar PluginDirectory)
-"$PLUGIN_DIR/.claude-swiftbar-status/uninstall.sh"
+"$PLUGIN_DIR/claude-swiftbar-status/uninstall.sh"
 ```
 
 ## Files

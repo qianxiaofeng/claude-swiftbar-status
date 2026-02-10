@@ -23,4 +23,46 @@ rm -fv "$PLUGIN_DIR"/ClaudeBar-*.sh
 # Remove old format (ClaudeBar.2s.sh)
 rm -fv "$PLUGIN_DIR"/ClaudeBar.*.sh
 
+# Remove hook config from settings.json
+SETTINGS="$HOME/.claude/settings.json"
+if [[ -f "$SETTINGS" ]]; then
+    python3 -c "
+import json, os
+
+path = '$SETTINGS'
+with open(path) as f:
+    cfg = json.load(f)
+
+hooks = cfg.get('hooks', {})
+matchers = hooks.get('SessionStart', [])
+
+# Remove matchers that reference session-track.sh
+filtered = []
+for m in matchers:
+    keep = True
+    for h in m.get('hooks', []):
+        if h.get('command', '').endswith('session-track.sh'):
+            keep = False
+            break
+    if keep:
+        filtered.append(m)
+
+if not filtered:
+    hooks.pop('SessionStart', None)
+else:
+    hooks['SessionStart'] = filtered
+
+if not hooks:
+    cfg.pop('hooks', None)
+
+with open(path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+    f.write('\n')
+"
+    echo "Removed SessionStart hook config from settings"
+fi
+
+# Clean up swiftbar state files
+rm -rf "$HOME/.claude/swiftbar"
+
 echo "Uninstalled all ClaudeBar plugins from $PLUGIN_DIR"

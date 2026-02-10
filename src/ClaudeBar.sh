@@ -65,15 +65,34 @@ if (( ${#CLAUDE_TTYS[@]} < SLOT_NUM )); then
     exit 0
 fi
 
-TTY_DEV="${CLAUDE_TTYS[$SLOT_NUM]}"
+# SwiftBar renders menu bar icons right-to-left (slot1=rightmost),
+# but users expect left-to-right = tab order. Reverse the index.
+TTY_DEV="${CLAUDE_TTYS[${#CLAUDE_TTYS[@]} - SLOT_NUM + 1]}"
 PID="${PID_BY_TTY[$TTY_DEV]}"
 CWD=$(lsof -p "$PID" -Fn 2>/dev/null | grep '^n/' | head -1 | cut -c2-)
 PROJECT_HASH=$(echo "$CWD" | sed 's|[/_]|-|g')
-TRANSCRIPT=$(ls -t "$HOME/.claude/projects/$PROJECT_HASH"/*.jsonl 2>/dev/null | head -1)
-if [[ -n "$TRANSCRIPT" ]]; then
+# Resolve transcript: state file → fallback (exclude transcripts claimed by other sessions)
+TTY_SHORT="${TTY_DEV#/dev/}"
+ACTIVE_CLAUDE_TTYS=""
+for _ct in "${CLAUDE_TTYS[@]}"; do
+    ACTIVE_CLAUDE_TTYS="${ACTIVE_CLAUDE_TTYS:+$ACTIVE_CLAUDE_TTYS,}${_ct#/dev/}"
+done
+TRANSCRIPT=$(/usr/bin/python3 "$SCRIPT_DIR/resolve_transcript.py" \
+    "$TTY_SHORT" "$HOME/.claude/swiftbar" "$HOME/.claude/projects/$PROJECT_HASH" "$ACTIVE_CLAUDE_TTYS")
+if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
     FILE_AGE=$(( $(date +%s) - $(stat -f %m "$TRANSCRIPT") ))
 else
+    TRANSCRIPT=""
     FILE_AGE=0
+fi
+
+# Debug: log slot→TTY→transcript mapping for diagnostics
+DEBUG_LOG="$HOME/.claude/swiftbar/debug.log"
+{
+    echo "$(date '+%H:%M:%S') slot=$SLOT_NUM tty=$TTY_DEV pid=$PID cwd=$(basename "$CWD") transcript=$(basename "$TRANSCRIPT") age=$FILE_AGE"
+} >> "$DEBUG_LOG" 2>/dev/null
+if [[ -f "$DEBUG_LOG" ]] && (( $(wc -l < "$DEBUG_LOG") > 200 )); then
+    tail -100 "$DEBUG_LOG" > "$DEBUG_LOG.tmp" && mv "$DEBUG_LOG.tmp" "$DEBUG_LOG"
 fi
 
 /usr/bin/python3 - "$HELPER" "$SF_GREEN" "$SF_ORANGE" "$SF_GRAY" \
