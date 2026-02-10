@@ -51,15 +51,6 @@ else
     FILE_AGE=0
 fi
 
-# Debug: log slot→TTY→transcript mapping for diagnostics
-DEBUG_LOG="$STATE_DIR/debug.log"
-{
-    echo "$(date '+%H:%M:%S') slot=$SLOT_NUM tty=$TTY_DEV pid=$PID cwd=$(basename "$CWD") transcript=$(basename "$TRANSCRIPT") age=$FILE_AGE"
-} >> "$DEBUG_LOG" 2>/dev/null
-if [[ -f "$DEBUG_LOG" ]] && (( $(wc -l < "$DEBUG_LOG") > 200 )); then
-    tail -100 "$DEBUG_LOG" > "$DEBUG_LOG.tmp" && mv "$DEBUG_LOG.tmp" "$DEBUG_LOG"
-fi
-
 /usr/bin/python3 - "$HELPER" "$SF_GREEN" "$SF_ORANGE" "$SF_GRAY" \
     "$TTY_DEV" "$CWD" "$TRANSCRIPT" "$FILE_AGE" << 'PYEOF'
 import json, sys, os
