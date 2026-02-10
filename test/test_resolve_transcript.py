@@ -90,8 +90,30 @@ class TestTwoSessionsSameProject(ResolveTestBase):
         # A's fallback must skip tp_b (claimed by B) and pick tp_a
         self.assertEqual(resolve("ttys000", self.state_dir, self.project_dir, active), tp_a)
 
-    def test_both_stale_known_limitation(self):
-        """Both state files stale -> no claims -> both get newest (known limitation)."""
+    def test_no_state_files_both_get_newest(self):
+        """No state files at all -> both resolve to newest transcript.
+
+        BUG: Two sessions in the same project, SessionStart hook never ran.
+        Both slots get the same (newest) transcript, so both show identical
+        status (e.g. both "active" when only one tab is actually working).
+
+        Expected: each session should get its own transcript.
+        Actual: both get the newest. This test documents the current behavior.
+        """
+        tp_active = self.add_transcript("active-session", age_offset=0)
+        tp_idle = self.add_transcript("idle-session", age_offset=30)
+        active = {"ttys000", "ttys009"}
+
+        result_a = resolve("ttys000", self.state_dir, self.project_dir, active)
+        result_b = resolve("ttys009", self.state_dir, self.project_dir, active)
+
+        # BUG: both get the same transcript (the newest one)
+        self.assertEqual(result_a, tp_active)
+        self.assertEqual(result_b, tp_active)
+        self.assertEqual(result_a, result_b, "Both resolve to same transcript — this is the bug")
+
+    def test_both_stale_both_get_newest(self):
+        """Both state files stale -> no claims -> both get newest."""
         tp_new = self.add_transcript("new", age_offset=0)
         self.add_transcript("old", age_offset=5)
         self.add_state("ttys000", "x", "/nonexistent/x.jsonl")

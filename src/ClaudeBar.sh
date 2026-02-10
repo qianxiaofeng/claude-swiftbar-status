@@ -15,6 +15,7 @@ if [[ -L "$SELF" ]]; then
     SELF="$LINK"
 fi
 SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+STATE_DIR="$SCRIPT_DIR/../.swiftbar"
 HELPER="$SCRIPT_DIR/focus-iterm.sh"
 
 # Extract slot number from filename: ClaudeBar-N.2s.sh → N
@@ -30,55 +31,19 @@ SF_GREEN=eyJyZW5kZXJpbmdNb2RlIjoiUGFsZXR0ZSIsImNvbG9ycyI6WyIjMzJENzRCIl19    # #
 SF_ORANGE=eyJyZW5kZXJpbmdNb2RlIjoiUGFsZXR0ZSIsImNvbG9ycyI6WyIjRkY5RjBBIl19   # #FF9F0A
 SF_GRAY=eyJyZW5kZXJpbmdNb2RlIjoiUGFsZXR0ZSIsImNvbG9ycyI6WyIjOEU4RTkzIl19     # #8E8E93
 
-# 1) Get all iTerm2 session TTYs in tab order (window → tab → session)
-ITERM_TTYS=("${(@f)$(osascript -e '
-tell application "iTerm2"
-    set out to ""
-    repeat with w in windows
-        tell w
-            repeat with t in tabs
-                repeat with s in sessions of t
-                    set out to out & (tty of s) & linefeed
-                end repeat
-            end repeat
-        end tell
-    end repeat
-    return out
-end tell
-' 2>/dev/null)}")
-
-# 2) Map claude PIDs by their TTY
-typeset -A PID_BY_TTY
-for p in $(pgrep -x claude 2>/dev/null); do
-    t="/dev/$(ps -o tty= -p "$p" 2>/dev/null | xargs)"
-    [[ "$t" != "/dev/" ]] && PID_BY_TTY[$t]=$p
-done
-
-# 3) Filter to TTYs running Claude, preserving iTerm tab order
-CLAUDE_TTYS=()
-for t in "${ITERM_TTYS[@]}"; do
-    [[ -n "${PID_BY_TTY[$t]}" ]] && CLAUDE_TTYS+=("$t")
-done
+# Read shared cache built by claude-status-cache.sh (runs every 2s)
+source "$STATE_DIR/cache.env" 2>/dev/null || exit 0
 
 # If the Nth session doesn't exist, output nothing → icon hides
-if (( ${#CLAUDE_TTYS[@]} < SLOT_NUM )); then
-    exit 0
-fi
+(( SLOT_COUNT < SLOT_NUM )) && exit 0
 
-# SwiftBar renders menu bar icons right-to-left (slot1=rightmost),
-# but users expect left-to-right = tab order. Reverse the index.
-TTY_DEV="${CLAUDE_TTYS[${#CLAUDE_TTYS[@]} - SLOT_NUM + 1]}"
-PID="${PID_BY_TTY[$TTY_DEV]}"
-CWD=$(lsof -p "$PID" -Fn 2>/dev/null | grep '^n/' | head -1 | cut -c2-)
-PROJECT_HASH=$(echo "$CWD" | sed 's|[/_]|-|g')
-# Resolve transcript: state file → fallback (exclude transcripts claimed by other sessions)
-TTY_SHORT="${TTY_DEV#/dev/}"
-ACTIVE_CLAUDE_TTYS=""
-for _ct in "${CLAUDE_TTYS[@]}"; do
-    ACTIVE_CLAUDE_TTYS="${ACTIVE_CLAUDE_TTYS:+$ACTIVE_CLAUDE_TTYS,}${_ct#/dev/}"
-done
+eval "TTY_DEV=\$SLOT_${SLOT_NUM}_TTY"
+eval "PID=\$SLOT_${SLOT_NUM}_PID"
+eval "CWD=\$SLOT_${SLOT_NUM}_CWD"
+eval "PROJECT_HASH=\$SLOT_${SLOT_NUM}_PROJECT_HASH"
+eval "TTY_SHORT=\$SLOT_${SLOT_NUM}_TTY_SHORT"
 TRANSCRIPT=$(/usr/bin/python3 "$SCRIPT_DIR/resolve_transcript.py" \
-    "$TTY_SHORT" "$HOME/.claude/swiftbar" "$HOME/.claude/projects/$PROJECT_HASH" "$ACTIVE_CLAUDE_TTYS")
+    "$TTY_SHORT" "$STATE_DIR" "$HOME/.claude/projects/$PROJECT_HASH" "$ACTIVE_CLAUDE_TTYS")
 if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
     FILE_AGE=$(( $(date +%s) - $(stat -f %m "$TRANSCRIPT") ))
 else
@@ -87,7 +52,7 @@ else
 fi
 
 # Debug: log slot→TTY→transcript mapping for diagnostics
-DEBUG_LOG="$HOME/.claude/swiftbar/debug.log"
+DEBUG_LOG="$STATE_DIR/debug.log"
 {
     echo "$(date '+%H:%M:%S') slot=$SLOT_NUM tty=$TTY_DEV pid=$PID cwd=$(basename "$CWD") transcript=$(basename "$TRANSCRIPT") age=$FILE_AGE"
 } >> "$DEBUG_LOG" 2>/dev/null

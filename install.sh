@@ -35,7 +35,10 @@ esac
 rm -f "$PLUGIN_DIR"/ClaudeBar.*.sh
 rm -f "$PLUGIN_DIR"/ClaudeBar-*.sh
 
-# Create new symlinks
+# Create cache plugin symlink (runs shared queries once per cycle)
+ln -sf "$SCRIPT_DIR/src/claude-status-cache.sh" "$PLUGIN_DIR/ClaudeBar-cache.2s.sh"
+
+# Create slot symlinks
 for i in $(seq 1 "$SLOTS"); do
     ln -sf "$SCRIPT_DIR/src/ClaudeBar.sh" "$PLUGIN_DIR/ClaudeBar-$i.2s.sh"
 done
@@ -74,6 +77,6 @@ with open(path, 'w') as f:
     f.write('\n')
 "
 
-echo "Installed $SLOTS slot(s) in $PLUGIN_DIR"
+echo "Installed cache + $SLOTS slot(s) in $PLUGIN_DIR"
 ls -la "$PLUGIN_DIR"/ClaudeBar-*.sh
 echo "Installed SessionStart hook: $HOOK_CMD"

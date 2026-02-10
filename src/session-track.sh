@@ -17,7 +17,8 @@ done
 # No TTY found or detached — nothing to do
 [ -z "$TTY" ] || [ "$TTY" = "??" ] && exit 0
 
-STATE_DIR="$HOME/.claude/swiftbar"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+STATE_DIR="$SCRIPT_DIR/../.swiftbar"
 mkdir -p "$STATE_DIR"
 
 # Read hook JSON from stdin and write state file
