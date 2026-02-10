@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# SwiftBar
+.swiftbar/
+
+# Editor
+*.swp
+*.swo
+*~
