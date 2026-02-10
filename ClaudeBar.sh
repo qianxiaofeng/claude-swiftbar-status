@@ -30,16 +30,43 @@ SF_GREEN=eyJyZW5kZXJpbmdNb2RlIjoiUGFsZXR0ZSIsImNvbG9ycyI6WyIjMzJENzRCIl19    # #
 SF_ORANGE=eyJyZW5kZXJpbmdNb2RlIjoiUGFsZXR0ZSIsImNvbG9ycyI6WyIjRkY5RjBBIl19   # #FF9F0A
 SF_GRAY=eyJyZW5kZXJpbmdNb2RlIjoiUGFsZXR0ZSIsImNvbG9ycyI6WyIjOEU4RTkzIl19     # #8E8E93
 
-PIDS=($(pgrep -x claude 2>/dev/null | sort -n))
-PID_COUNT=${#PIDS[@]}
+# 1) Get all iTerm2 session TTYs in tab order (window → tab → session)
+ITERM_TTYS=("${(@f)$(osascript -e '
+tell application "iTerm2"
+    set out to ""
+    repeat with w in windows
+        tell w
+            repeat with t in tabs
+                repeat with s in sessions of t
+                    set out to out & (tty of s) & linefeed
+                end repeat
+            end repeat
+        end tell
+    end repeat
+    return out
+end tell
+' 2>/dev/null)}")
 
-# If the Nth process doesn't exist, output nothing → icon hides
-if (( PID_COUNT < SLOT_NUM )); then
+# 2) Map claude PIDs by their TTY
+typeset -A PID_BY_TTY
+for p in $(pgrep -x claude 2>/dev/null); do
+    t="/dev/$(ps -o tty= -p "$p" 2>/dev/null | xargs)"
+    [[ "$t" != "/dev/" ]] && PID_BY_TTY[$t]=$p
+done
+
+# 3) Filter to TTYs running Claude, preserving iTerm tab order
+CLAUDE_TTYS=()
+for t in "${ITERM_TTYS[@]}"; do
+    [[ -n "${PID_BY_TTY[$t]}" ]] && CLAUDE_TTYS+=("$t")
+done
+
+# If the Nth session doesn't exist, output nothing → icon hides
+if (( ${#CLAUDE_TTYS[@]} < SLOT_NUM )); then
     exit 0
 fi
 
-PID=${PIDS[$SLOT_NUM]}
-TTY_DEV="/dev/$(ps -o tty= -p "$PID" 2>/dev/null | xargs)"
+TTY_DEV="${CLAUDE_TTYS[$SLOT_NUM]}"
+PID="${PID_BY_TTY[$TTY_DEV]}"
 CWD=$(lsof -p "$PID" -Fn 2>/dev/null | grep '^n/' | head -1 | cut -c2-)
 PROJECT_HASH=$(echo "$CWD" | sed 's|[/_]|-|g')
 TRANSCRIPT=$(ls -t "$HOME/.claude/projects/$PROJECT_HASH"/*.jsonl 2>/dev/null | head -1)

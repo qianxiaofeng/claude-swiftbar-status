@@ -14,14 +14,17 @@ When no Claude session exists for a slot, its icon is automatically hidden.
 
 ## How It Works
 
-Each slot is a symlink (`ClaudeBar-1.2s.sh`, `ClaudeBar-2.2s.sh`, ...) pointing to the same `ClaudeBar.sh` script. The script extracts its slot number from the filename and monitors only the Nth Claude process (sorted by PID). When no process exists for that slot, the script outputs nothing and SwiftBar hides the icon.
+Each slot is a symlink (`ClaudeBar-1.2s.sh`, `ClaudeBar-2.2s.sh`, ...) pointing to the same `ClaudeBar.sh` script. The script extracts its slot number from the filename and monitors the Nth Claude session based on iTerm2 tab order. When no session exists for that slot, the script outputs nothing and SwiftBar hides the icon.
 
-1. Finds running `claude` processes via `pgrep`, sorted by PID.
-2. Each slot picks the Nth process and maps it to its TTY and working directory.
-3. Locates the Claude Code transcript (`.jsonl`) under `~/.claude/projects/`.
-4. Determines status by checking transcript age and pending tool use.
-5. Outputs SwiftBar-formatted lines with SF Symbols.
-6. Clicking the icon runs `focus-iterm.sh` to activate the corresponding iTerm2 tab.
+1. Queries iTerm2 via AppleScript to get all session TTYs in tab order (window → tab → session).
+2. Finds running `claude` processes and maps each to its TTY.
+3. Filters and orders sessions by iTerm2 tab position — slot N = the Nth tab running Claude.
+4. Locates the Claude Code transcript (`.jsonl`) under `~/.claude/projects/`.
+5. Determines status by checking transcript age and pending tool use.
+6. Outputs SwiftBar-formatted lines with SF Symbols.
+7. Clicking the icon runs `focus-iterm.sh` to activate the corresponding iTerm2 tab.
+
+Menu bar icon order matches iTerm2 tab order. Dragging tabs rearranges icons on the next refresh (≤2s).
 
 ## Prerequisites
 
