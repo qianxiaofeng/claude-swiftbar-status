@@ -19,7 +19,7 @@ It auto-discovers running sessions and hides itself when no sessions are active.
 ## Prerequisites
 
 - macOS
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI and/or Codex CLI
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI and/or [Codex CLI](https://developers.openai.com/codex)
 - [Rust toolchain](https://rustup.rs/) (for building `claude-bar`)
 - Xcode Command Line Tools (`swiftc`)
 - iTerm2 and/or Alacritty for best focus support
