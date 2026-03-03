@@ -16,8 +16,8 @@ pub fn run_hook() -> Result<(), Box<dyn std::error::Error>> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
 
-    let (session_id, transcript_path) = parse_hook_input(&input)
-        .ok_or("Failed to parse hook JSON from stdin")?;
+    let (session_id, transcript_path) =
+        parse_hook_input(&input).ok_or("Failed to parse hook JSON from stdin")?;
 
     // Walk up process tree to find claude and its TTY
     let ppid = std::os::unix::process::parent_id();
@@ -97,8 +97,14 @@ mod tests {
     #[test]
     fn test_find_tty_from_tree() {
         let mut lookup = HashMap::new();
-        lookup.insert(100, ("zsh".to_string(), 50, Some("/dev/ttys000".to_string())));
-        lookup.insert(50, ("claude".to_string(), 1, Some("/dev/ttys000".to_string())));
+        lookup.insert(
+            100,
+            ("zsh".to_string(), 50, Some("/dev/ttys000".to_string())),
+        );
+        lookup.insert(
+            50,
+            ("claude".to_string(), 1, Some("/dev/ttys000".to_string())),
+        );
 
         let tty = find_tty_from_tree(100, &lookup);
         assert_eq!(tty, Some("/dev/ttys000".to_string()));
@@ -107,8 +113,14 @@ mod tests {
     #[test]
     fn test_find_tty_from_tree_no_claude() {
         let mut lookup = HashMap::new();
-        lookup.insert(100, ("zsh".to_string(), 50, Some("/dev/ttys000".to_string())));
-        lookup.insert(50, ("bash".to_string(), 1, Some("/dev/ttys000".to_string())));
+        lookup.insert(
+            100,
+            ("zsh".to_string(), 50, Some("/dev/ttys000".to_string())),
+        );
+        lookup.insert(
+            50,
+            ("bash".to_string(), 1, Some("/dev/ttys000".to_string())),
+        );
 
         assert_eq!(find_tty_from_tree(100, &lookup), None);
     }

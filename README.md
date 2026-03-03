@@ -1,109 +1,137 @@
 # Claude Bar
 
-A native macOS menu bar app that shows the status of your running Claude Code and Codex sessions. Uses SF Symbols to display session status at a glance — the icon auto-hides when no sessions are running.
+Native macOS menu bar app for live Claude Code and Codex session status.
+It auto-discovers running sessions and hides itself when no sessions are active.
 
 ![demo](doc/example.gif)
 
-## Status Indicators
+## Features
 
-The menu bar shows a `cpu.fill` SF Symbol per session, colored by status. Pending/idle icons have a breathing animation to draw attention.
-
-| Color | Meaning |
-|:-----:|---------|
-| Green | Session is actively running |
-| Orange | Session is waiting for user action (tool approval / plan review) |
-| Gray | Session is idle |
-
-Click the icon to see a dropdown with project names and status. Click any project to focus its terminal window.
-
-## How It Works
-
-Two binaries work together:
-
-- **`claude-bar poll`** (Rust) — single-shot polling. Discovers running `claude` and `codex` processes via `pgrep`/`ps`/`lsof`, detects terminals (iTerm2 + Alacritty), reads Claude Code transcripts or Codex session logs to determine status, and outputs `[SessionInfo]` JSON to stdout.
-
-- **`claude-bar-app`** (Swift) — native `NSStatusItem` menu bar app, managed by launchd. Calls `claude-bar poll` every 2 seconds and renders SF Symbol icons + dropdown menu.
-
-- **`claude-bar hook`** — registered as a Claude Code `SessionStart` hook. Reads session JSON from stdin and writes a state file for reliable Claude transcript resolution.
-
-- **`claude-bar focus`** — activated on dropdown click. Brings the corresponding terminal window/tab to the foreground via AppleScript (iTerm2) or window matching (Alacritty).
-
-Sessions are auto-discovered — no manual configuration needed.
+- Single icon shows one `cpu.fill` SF Symbol per detected session.
+- Colors map to status:
+  - Green: running
+  - Orange: waiting for user action
+  - Gray: idle
+- Pending and idle sessions use a breathing animation.
+- Click menu item to focus the matching terminal window (iTerm2 / Alacritty).
+- Supports mixed environments (including tmux/zellij sessions via fallback detection).
 
 ## Prerequisites
 
 - macOS
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI and/or Codex CLI
-- [Rust toolchain](https://rustup.rs/) (for building)
-- Xcode Command Line Tools (for `swiftc`)
-- iTerm2 and/or Alacritty (also works under Zellij/tmux)
+- [Rust toolchain](https://rustup.rs/) (for building `claude-bar`)
+- Xcode Command Line Tools (`swiftc`)
+- iTerm2 and/or Alacritty for best focus support
 
-## Installation
+## Install
 
-1. Clone the repo:
+```sh
+git clone https://github.com/qianxiaofeng/claude-menubar.git
+cd claude-menubar
+./install.sh
+```
 
-   ```sh
-   git clone https://github.com/qianxiaofeng/claude-menubar.git
-   cd claude-menubar
-   ```
+`install.sh` will:
 
-2. Run the install script:
+- build `target/release/claude-bar` (Rust)
+- build `target/release/claude-bar-app` (Swift)
+- install/start LaunchAgent `com.claude.claude-bar-daemon`
+- register Claude Code `SessionStart` hook: `claude-bar hook`
 
-   ```sh
-   ./install.sh
-   ```
+After install, the menu bar item appears automatically when sessions are detected.
 
-   This will:
-   - Build the Rust binary (`cargo build --release`)
-   - Build the Swift menu bar app (`swiftc`)
-   - Start a launchd daemon (`com.claude.claude-bar-daemon`)
-   - Register a `SessionStart` hook in `~/.claude/settings.json`
-
-3. The icon appears automatically when Claude Code or Codex sessions are running.
-
-## Uninstallation
+## Uninstall
 
 ```sh
 ./uninstall.sh
 ```
 
-This stops the daemon, removes hooks from settings, and cleans up state files.
+This removes the LaunchAgent, cleans hook entries from `~/.claude/settings.json`, and deletes local state files under `~/.claude/claude-bar`.
+
+## Status Semantics
+
+### Claude sessions
+
+- `pending`: unpaired `tool_use` waiting for user action (with grace/timeout logic)
+- `active`: recent transcript activity, or last message from user while Claude is working
+- `idle`: assistant done and no pending work
+
+### Codex sessions
+
+- `pending`: at least one pending `function_call` requesting `sandbox_permissions=require_escalated`
+- `active`: pending non-escalation call, or very recent session activity
+- `idle`: no pending calls and session not recently updated
+
+## CLI
+
+```sh
+# One-shot poll; prints JSON array of SessionInfo
+target/release/claude-bar poll
+
+# SessionStart hook (reads JSON from stdin, writes session state file)
+target/release/claude-bar hook
+
+# Install/uninstall hook entries in settings.json
+target/release/claude-bar hooks-install --command "target/release/claude-bar hook"
+target/release/claude-bar hooks-uninstall
+
+# Focus terminal window for a session
+target/release/claude-bar focus --terminal iterm2 --tty /dev/ttys003 --cwd /path/to/project
+```
+
+`poll` output fields:
+
+- `tty`, `pid`, `cwd`
+- `provider` (`claude` or `codex`)
+- `terminal` (`iterm2`, `alacritty`, `unknown`)
+- `transcript` (optional path)
+- `status` (`active`, `pending`, `idle`)
 
 ## Architecture
 
 ```
-claude-bar-app  (Swift, launchd-managed NSStatusItem)
-    │
-    ├── NSTimer (every 2s) → shell out to claude-bar poll
-    ├── SF Symbol composition → menu bar icon
-    └── NSMenu → per-session dropdown → claude-bar focus
-         │
-claude-bar poll  (Rust, single-shot)
-    │
-    ├── pgrep/ps/lsof → discover claude/codex processes + TTYs
-    ├── iTerm2 AppleScript / Alacritty lsof → detect terminals
-    ├── ~/.claude/projects/*/*.jsonl → parse Claude transcripts
-    └── ~/.codex/sessions/**/*.jsonl → parse Codex session logs, detect status
+claude-bar-app (Swift, NSStatusItem, launchd-managed)
+  -> polls `claude-bar poll` every 2s
+  -> renders SF Symbols + menu
+  -> calls `claude-bar focus` on click
 
-claude-bar hook  (Rust, SessionStart hook, stdin JSON)
-    └── write state file for transcript resolution
+claude-bar (Rust)
+  poll  -> detect claude/codex processes + terminal TTYs + transcript status
+  hook  -> SessionStart hook state writer
+  focus -> terminal focus action
 ```
 
-### Source Modules
+Main data locations:
+
+- Claude transcripts: `~/.claude/projects/<project-hash>/*.jsonl`
+- Codex sessions: `~/.codex/sessions/**/*.jsonl`
+- Hook state cache: `~/.claude/claude-bar/<project-hash>/session-<tty>.json`
+
+## Troubleshooting
+
+- Check daemon logs:
+  - `/tmp/claude-bar.out.log`
+  - `/tmp/claude-bar.err.log`
+- Verify polling manually:
+  - `target/release/claude-bar poll`
+- If focusing Alacritty fails, ensure Accessibility permissions allow window control via System Events.
+- If no sessions appear, confirm `claude`/`codex` are running in interactive TTYs (not detached `??` processes).
+
+## Source Modules
 
 | Module | Purpose |
 |--------|---------|
-| `src/main.rs` | CLI entry point (clap subcommands: poll, hook, focus) |
-| `src/serve.rs` | `poll_sessions()` + `find_state_dir()` |
-| `src/process.rs` | Process discovery (pgrep/ps/lsof parsing) |
-| `src/transcript.rs` | JSONL transcript parsing + status detection |
-| `src/terminal.rs` | iTerm2 AppleScript + Alacritty enumeration |
-| `src/state.rs` | Data structures (SessionInfo, Status, Terminal) |
-| `src/hook.rs` | SessionStart hook handler |
-| `src/focus.rs` | Terminal window focus |
-| `src/icon.rs` | Dot-grid PNG generation (test-only, legacy) |
-| `build.rs` | Pre-generate PNG combinations (legacy, kept for icon.rs tests) |
-| `swift/ClaudeBar.swift` | Native AppKit menu bar app |
+| `src/main.rs` | CLI entry point (`poll`, `hook`, `focus`) |
+| `src/serve.rs` | Session discovery and aggregation |
+| `src/process.rs` | Process/TTY/CWD discovery via `pgrep`/`ps`/`lsof` |
+| `src/transcript.rs` | Claude/Codex JSONL parsing and status determination |
+| `src/terminal.rs` | iTerm2 + Alacritty session enumeration and merge |
+| `src/settings.rs` | Hook settings.json install/uninstall management |
+| `src/state.rs` | Core data models (`SessionInfo`, `Status`, `Provider`, `Terminal`) |
+| `src/hook.rs` | Claude SessionStart hook handler |
+| `src/focus.rs` | iTerm2/Alacritty window focusing |
+| `swift/ClaudeBar.swift` | AppKit menu bar UI |
 
 ## License
 

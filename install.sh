@@ -63,50 +63,7 @@ echo "Started daemon: $PLIST_LABEL"
 HOOK_CMD="$BINARY hook"
 SETTINGS="$HOME/.claude/settings.json"
 
-python3 -c "
-import json, os, sys
-
-path = sys.argv[1]
-hook_cmd = sys.argv[2]
-
-cfg = {}
-if os.path.exists(path):
-    with open(path) as f:
-        cfg = json.load(f)
-
-hooks_cfg = cfg.setdefault('hooks', {})
-changed = False
-
-# Cleanup: remove old hooks from previous installs
-old_scripts = ('update-status.sh', 'session-track.sh')
-for event in ('UserPromptSubmit', 'Stop', 'Notification', 'SessionEnd', 'SessionStart'):
-    matchers = hooks_cfg.get(event, [])
-    filtered = [m for m in matchers
-                if not any(any(s in h.get('command', '') for s in old_scripts)
-                           for h in m.get('hooks', []))]
-    if len(filtered) != len(matchers):
-        changed = True
-        if filtered:
-            hooks_cfg[event] = filtered
-        else:
-            hooks_cfg.pop(event, None)
-
-# Register new SessionStart hook
-matchers = hooks_cfg.setdefault('SessionStart', [])
-already = any(hook_cmd in h.get('command', '')
-              for m in matchers for h in m.get('hooks', []))
-if not already:
-    matchers.append({'hooks': [{'type': 'command', 'command': hook_cmd}]})
-    changed = True
-
-if not hooks_cfg:
-    cfg.pop('hooks', None)
-
-if changed:
-    with open(path, 'w') as f:
-        json.dump(cfg, f, indent=2)
-        f.write('\n')
-" "$SETTINGS" "$HOOK_CMD"
+"$BINARY" hooks-install --settings "$SETTINGS" --command "$HOOK_CMD"
 
 echo "Registered hook: SessionStart → $HOOK_CMD"
 echo "Installation complete."

@@ -53,11 +53,7 @@ end tell"#
 }
 
 /// Focus the terminal window for the given session.
-pub fn run_focus(
-    terminal: &str,
-    tty: &str,
-    cwd: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_focus(terminal: &str, tty: &str, cwd: &str) -> Result<(), Box<dyn std::error::Error>> {
     match terminal {
         "iterm2" => focus_iterm2(tty),
         "alacritty" => focus_alacritty(cwd),

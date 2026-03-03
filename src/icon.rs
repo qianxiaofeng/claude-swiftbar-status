@@ -243,10 +243,15 @@ mod tests {
         use base64::Engine;
         let png = make_dot_grid_png(&[Status::Active, Status::Pending, Status::Idle]);
         let b64 = base64::engine::general_purpose::STANDARD.encode(&png);
-        let decoded = base64::engine::general_purpose::STANDARD.decode(&b64).unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(&b64)
+            .unwrap();
         assert_eq!(decoded, png);
         // Verify it's a valid PNG
-        assert_eq!(&decoded[..8], &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]);
+        assert_eq!(
+            &decoded[..8],
+            &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]
+        );
     }
 
     #[test]
@@ -292,7 +297,10 @@ mod tests {
                     v /= 3;
                 }
                 let b64 = get_dot_grid_base64(&statuses);
-                assert!(!b64.is_empty(), "Missing entry for count={count}, combo={combo}");
+                assert!(
+                    !b64.is_empty(),
+                    "Missing entry for count={count}, combo={combo}"
+                );
             }
         }
     }
@@ -338,7 +346,8 @@ mod tests {
             if ct == chunk_type {
                 return true;
             }
-            let len = u32::from_be_bytes([png[pos], png[pos + 1], png[pos + 2], png[pos + 3]]) as usize;
+            let len =
+                u32::from_be_bytes([png[pos], png[pos + 1], png[pos + 2], png[pos + 3]]) as usize;
             pos += 12 + len; // 4 (len) + 4 (type) + len (data) + 4 (crc)
         }
         false

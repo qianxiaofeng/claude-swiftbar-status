@@ -255,7 +255,11 @@ mod tests {
     #[test]
     fn test_merge_partial_claude() {
         // Only some TTYs have Claude running
-        let iterm = vec!["/dev/ttys000".into(), "/dev/ttys001".into(), "/dev/ttys002".into()];
+        let iterm = vec![
+            "/dev/ttys000".into(),
+            "/dev/ttys001".into(),
+            "/dev/ttys002".into(),
+        ];
         let alacritty: Vec<String> = vec![];
         let mut pid_by_tty = HashMap::new();
         pid_by_tty.insert("/dev/ttys000".into(), 100);

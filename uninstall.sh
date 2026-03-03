@@ -3,6 +3,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BINARY="$SCRIPT_DIR/target/release/claude-bar"
+
 # 1. Stop daemon
 PLIST_LABEL="com.claude.claude-bar-daemon"
 PLIST="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
@@ -14,36 +17,12 @@ echo "Stopped and removed daemon: $PLIST_LABEL"
 # 2. Remove hook config from settings.json
 SETTINGS="$HOME/.claude/settings.json"
 if [[ -f "$SETTINGS" ]]; then
-    python3 -c "
-import json, os
-
-path = '$SETTINGS'
-with open(path) as f:
-    cfg = json.load(f)
-
-hooks = cfg.get('hooks', {})
-
-# Scripts/commands to remove across all event types
-remove_patterns = ('session-track.sh', 'update-status.sh', 'claude-bar')
-
-for event in list(hooks.keys()):
-    matchers = hooks[event]
-    filtered = [m for m in matchers
-                if not any(any(s in h.get('command', '') for s in remove_patterns)
-                           for h in m.get('hooks', []))]
-    if not filtered:
-        hooks.pop(event)
-    else:
-        hooks[event] = filtered
-
-if not hooks:
-    cfg.pop('hooks', None)
-
-with open(path, 'w') as f:
-    json.dump(cfg, f, indent=2)
-    f.write('\n')
-"
-    echo "Removed hook config from settings"
+    if [[ -x "$BINARY" ]]; then
+        "$BINARY" hooks-uninstall --settings "$SETTINGS"
+        echo "Removed hook config from settings"
+    else
+        echo "Warning: $BINARY not found, skipping hook cleanup in settings"
+    fi
 fi
 
 # 3. Clean up state files

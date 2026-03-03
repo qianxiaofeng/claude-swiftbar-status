@@ -4,14 +4,19 @@ mod hook;
 mod icon;
 mod process;
 mod serve;
+mod settings;
 mod state;
 mod terminal;
 mod transcript;
 
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "claude-bar", about = "Claude Code session status for macOS menu bar")]
+#[command(
+    name = "claude-bar",
+    about = "Claude Code session status for macOS menu bar"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -35,6 +40,21 @@ enum Commands {
         #[arg(long, default_value = "")]
         cwd: String,
     },
+    /// Install/update Claude hook entries in settings.json
+    HooksInstall {
+        /// Hook command to register under SessionStart
+        #[arg(long)]
+        command: String,
+        /// Optional settings path (defaults to ~/.claude/settings.json)
+        #[arg(long)]
+        settings: Option<PathBuf>,
+    },
+    /// Remove Claude Bar-managed hook entries from settings.json
+    HooksUninstall {
+        /// Optional settings path (defaults to ~/.claude/settings.json)
+        #[arg(long)]
+        settings: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -44,6 +64,14 @@ fn main() {
         Commands::Poll => run_poll(),
         Commands::Hook => hook::run_hook(),
         Commands::Focus { terminal, tty, cwd } => focus::run_focus(&terminal, &tty, &cwd),
+        Commands::HooksInstall { command, settings } => {
+            let settings_path = settings.unwrap_or_else(settings::default_settings_path);
+            settings::install_session_start_hook(&settings_path, &command).map(|_| ())
+        }
+        Commands::HooksUninstall { settings } => {
+            let settings_path = settings.unwrap_or_else(settings::default_settings_path);
+            settings::uninstall_managed_hooks(&settings_path).map(|_| ())
+        }
     };
 
     if let Err(e) = result {
